@@ -1,0 +1,12 @@
+.env
+__pycache__/
+*.pyc
+.venv/
+venv/
+node_modules/
+.DS_Store
+
+# Ignore storage files
+storage/*
+WORK_PROGRESS.md
+requested_files_export.md

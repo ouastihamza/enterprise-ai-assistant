@@ -1,0 +1,62 @@
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: ai_agency_db
+    restart: always
+    environment:
+      POSTGRES_USER: ai_user
+      POSTGRES_PASSWORD: ai_secure_password
+      POSTGRES_DB: ai_agency
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ai_user -d ai_agency"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build: .
+    container_name: ai_agency_api
+    restart: always
+    env_file:
+      - .env
+    environment:
+      # .env may use localhost for host-run development; inside Compose the
+      # database is reached through the service DNS name.
+      DB_HOST: db
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./storage:/app/storage
+    depends_on:
+      db:
+        condition: service_healthy
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/', timeout=5)"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        # Baked into the client-side JS bundle at build time, so this
+        # must be reachable from the user's browser, not just from
+        # inside the Docker network.
+        NEXT_PUBLIC_API_BASE_URL: http://localhost:8000
+    container_name: ai_agency_frontend
+    restart: always
+    ports:
+      - "3000:3000"
+    depends_on:
+      api:
+        condition: service_healthy
+
+volumes:
+  postgres_data:

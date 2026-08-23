@@ -1,0 +1,25 @@
+.git
+.gitignore
+.dockerignore
+
+.env
+.env.*
+!.env.example
+
+.venv
+venv
+__pycache__
+*.py[cod]
+*.pyo
+.pytest_cache
+.mypy_cache
+.ruff_cache
+
+.DS_Store
+
+storage
+data
+tests
+# The frontend has its own Docker build context (frontend/); excluding it here
+# avoids sending local Next.js build artifacts to the backend builder.
+frontend
