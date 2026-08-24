@@ -42,6 +42,7 @@ class VectorSearchService:
         question: str,
         top_k: int = 5,
         min_score: float | None = None,
+        where: dict | None = None,
     ) -> list[dict]:
         cleaned_question = question.strip()
 
@@ -69,6 +70,7 @@ class VectorSearchService:
         results = self.vector_database.search(
             embedding=embedding,
             top_k=top_k,
+            where=where,
         )
 
         documents = (

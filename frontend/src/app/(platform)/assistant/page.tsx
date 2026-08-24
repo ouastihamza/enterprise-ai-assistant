@@ -9,6 +9,7 @@ import {
 import {
   AlertCircle,
   ArrowUp,
+  Building2,
   ChevronDown,
   FileText,
   Loader2,
@@ -44,6 +45,9 @@ import {
   type Conversation,
   type ConversationMessage,
 } from "../../../services/conversation.service";
+
+import { listCustomers } from "../../../services/customers.service";
+import type { Customer } from "../../../types/customer.types";
 
 type ChatRole = "user" | "assistant";
 
@@ -498,6 +502,15 @@ export default function AssistantPage() {
   const [input, setInput] =
     useState("");
 
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [selectedCustomerId, setSelectedCustomerId] = useState("");
+  const [isLoadingCustomers, setIsLoadingCustomers] = useState(false);
+  const [customerLoadError, setCustomerLoadError] = useState(false);
+
+  const selectedCustomer = customers.find(
+    (customer) => customer.id === selectedCustomerId
+  );
+
   const [
     isSending,
     setIsSending,
@@ -929,6 +942,39 @@ export default function AssistantPage() {
     void loadWorkspaceConversations();
   }, [workspaceId]);
 
+  useEffect(() => {
+    setCustomers([]);
+    setSelectedCustomerId("");
+    setCustomerLoadError(false);
+    setIsLoadingCustomers(false);
+    if (!workspaceId) return;
+    let isCurrent = true;
+    setIsLoadingCustomers(true);
+    void listCustomers(workspaceId)
+      .then((items) => {
+        if (!isCurrent) return;
+        setCustomers(items);
+        const requestedCustomerId = new URLSearchParams(window.location.search).get("customer");
+        const requestedCustomer = items.find((item) => item.id === requestedCustomerId);
+        const demo = items.find((item) => item.company_name === "Demo Industrie SAS");
+        if (requestedCustomer) {
+          setSelectedCustomerId(requestedCustomer.id);
+        } else if (demo) {
+          setSelectedCustomerId(demo.id);
+        }
+      })
+      .catch(() => {
+        if (isCurrent) {
+          setCustomers([]);
+          setCustomerLoadError(true);
+        }
+      })
+      .finally(() => {
+        if (isCurrent) setIsLoadingCustomers(false);
+      });
+    return () => { isCurrent = false; };
+  }, [workspaceId]);
+
   const resizeTextarea = () => {
     const element =
       textareaRef.current;
@@ -992,6 +1038,7 @@ export default function AssistantPage() {
             question,
             conversation_id:
               conversationId,
+            customer_id: selectedCustomerId || null,
           }
         );
 
@@ -1052,11 +1099,17 @@ export default function AssistantPage() {
     }
   };
 
-  const suggestedPrompts = [
-    "What's covered in our onboarding docs?",
-    "Summarize our latest policy updates.",
-    "What does the knowledge base say about pricing?",
-  ];
+  const suggestedPrompts = selectedCustomerId
+    ? [
+        "Why was February more expensive than January?",
+        "Summarize this customer's contract.",
+        "Compare January and February consumption.",
+      ]
+    : [
+        "What's covered in our onboarding docs?",
+        "Summarize our latest policy updates.",
+        "What does the knowledge base say about pricing?",
+      ];
 
   const composerDisabled =
     isSending ||
@@ -1077,7 +1130,11 @@ export default function AssistantPage() {
           <h1>{assistantName}</h1>
         </div>
 
-        <p>{welcomeMessage}</p>
+        <p>
+          {selectedCustomer
+            ? `Ask about ${selectedCustomer.company_name}'s profile, sites and documents.`
+            : welcomeMessage}
+        </p>
       </section>
 
       <div className="assistant-workspace">
@@ -1249,7 +1306,9 @@ export default function AssistantPage() {
 
                   <div className="assistant-empty__content">
                     <strong>
-                      {welcomeMessage}
+                      {selectedCustomer
+                        ? "Choose a suggested question or ask anything about this customer's information."
+                        : welcomeMessage}
                     </strong>
 
                     <div className="assistant-empty__prompts">
@@ -1377,6 +1436,25 @@ export default function AssistantPage() {
           </div>
 
           <div className="assistant-composer">
+            <div className="assistant-customer-context">
+              <Building2 size={15} />
+              <label htmlFor="assistant-customer">Customer</label>
+              <select
+                id="assistant-customer"
+                value={selectedCustomerId}
+                onChange={(event) => setSelectedCustomerId(event.target.value)}
+                disabled={isSending}
+              >
+                <option value="">
+                  {isLoadingCustomers ? "Loading customers…" : "All company information"}
+                </option>
+                {customers.map((customer) => (
+                  <option key={customer.id} value={customer.id}>{customer.company_name}</option>
+                ))}
+              </select>
+              {selectedCustomerId && <span>Using profile details and documents</span>}
+              {customerLoadError && <span className="assistant-customer-context__error">Customer list unavailable</span>}
+            </div>
             <div className="assistant-composer__inner">
               <textarea
                 ref={textareaRef}
@@ -1386,7 +1464,7 @@ export default function AssistantPage() {
                   resizeTextarea();
                 }}
                 onKeyDown={handleKeyDown}
-                placeholder="Ask a question about your documents..."
+                placeholder={selectedCustomer ? `Ask about ${selectedCustomer.company_name}...` : "Ask about company information..."}
                 rows={1}
                 disabled={composerDisabled}
               />

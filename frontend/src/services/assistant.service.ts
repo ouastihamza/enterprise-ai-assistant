@@ -46,6 +46,7 @@ export interface AssistantChatRequest {
   workspace_id: string;
   question: string;
   conversation_id?: string | null;
+  customer_id?: string | null;
 }
 
 export interface AssistantChatResponse {

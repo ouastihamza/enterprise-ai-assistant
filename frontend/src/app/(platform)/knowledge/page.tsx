@@ -346,7 +346,7 @@ export default function KnowledgePage() {
           </span>
 
           <h1>
-            Knowledge base
+            Company documents
             <span>
               {" "}
               for{" "}
@@ -358,9 +358,9 @@ export default function KnowledgePage() {
         </div>
 
         <p>
-          Upload documents here and they become
-          searchable inside your AI assistant, isolated
-          to this workspace only.
+          Upload contracts, invoices, consumption records
+          and procedures so the assistant can use them in
+          clear, sourced answers.
         </p>
       </section>
 
@@ -517,6 +517,10 @@ export default function KnowledgePage() {
 
                 <span className="knowledge-table__size">
                   {formatBytes(doc.file_size)}
+                </span>
+
+                <span className="knowledge-table__category">
+                  {doc.category}
                 </span>
 
                 <span className="knowledge-table__date">
@@ -714,7 +718,7 @@ export default function KnowledgePage() {
 
         .knowledge-table__row {
           display: grid;
-          grid-template-columns: 1fr 90px 110px 120px 40px;
+          grid-template-columns: minmax(180px, 1fr) 100px 80px 110px 120px 40px;
           align-items: center;
           gap: 1rem;
           padding: 0.85rem 1.1rem;
@@ -743,6 +747,16 @@ export default function KnowledgePage() {
         .knowledge-table__size,
         .knowledge-table__date {
           opacity: 0.65;
+        }
+
+        .knowledge-table__category {
+          width: fit-content;
+          padding: 0.25rem 0.55rem;
+          border-radius: 999px;
+          color: #067e91;
+          background: rgba(13, 184, 189, 0.1);
+          font-size: 0.72rem;
+          font-weight: 650;
         }
 
         .knowledge-table__delete {
@@ -814,6 +828,7 @@ export default function KnowledgePage() {
             grid-template-columns: 1fr 40px;
             grid-template-areas:
               "name delete"
+              "category category"
               "size size"
               "date date"
               "status status";
@@ -830,6 +845,10 @@ export default function KnowledgePage() {
 
           .knowledge-table__size {
             grid-area: size;
+          }
+
+          .knowledge-table__category {
+            grid-area: category;
           }
 
           .knowledge-table__date {

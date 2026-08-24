@@ -22,6 +22,8 @@ GROUNDING_INSTRUCTIONS = (
     "You must answer using only the information given in the "
     "Context below. When a statement comes from the context, cite "
     "it inline using the matching tag, e.g. [Source 1], [Source 2]. "
+    "Structured customer facts are labeled [Customer profile] and may be "
+    "cited using that exact label. "
     "If the context does not contain enough information to answer "
     "the question, say so clearly instead of guessing."
 )
@@ -60,10 +62,12 @@ class RAGService:
     def retrieve_context(
         self,
         question: str,
+        customer_id: str | None = None,
     ) -> list[dict]:
         return self.vector_search.search(
             question=question,
             top_k=self.settings.top_k,
+            where={"customer_id": customer_id} if customer_id else None,
         )
 
     @staticmethod
@@ -165,15 +169,18 @@ class RAGService:
     def answer_question_with_sources(
         self,
         question: str,
+        customer_id: str | None = None,
+        customer_context: str | None = None,
     ) -> dict:
 
         start_time = time.perf_counter()
 
         retrieved_chunks = self.retrieve_context(
-            question
+            question,
+            customer_id=customer_id,
         )
 
-        if not retrieved_chunks:
+        if not retrieved_chunks and not customer_context:
             return {
                 "answer": (
                     "I couldn't find any relevant information "
@@ -185,6 +192,13 @@ class RAGService:
         context = self.build_context(
             retrieved_chunks
         )
+
+        if customer_context:
+            context = (
+                f"[Customer profile]\n{customer_context}\n\n{context}"
+                if context
+                else f"[Customer profile]\n{customer_context}"
+            )
 
         base_system_prompt = (
             self.settings.system_prompt.strip()
@@ -240,13 +254,21 @@ Question:
             "top_score=%s | duration=%.2fs",
             self.workspace_id,
             len(retrieved_chunks),
-            retrieved_chunks[0]["score"],
+            retrieved_chunks[0]["score"] if retrieved_chunks else None,
             elapsed,
         )
 
-        return {
-            "answer": answer,
-            "sources": self.build_sources(
-                retrieved_chunks
-            ),
-        }
+        sources = self.build_sources(retrieved_chunks)
+        if customer_context:
+            sources.insert(
+                0,
+                {
+                    "rank": 0,
+                    "document_name": "Customer profile",
+                    "chunk_id": None,
+                    "score": 1.0,
+                    "preview": customer_context[:300],
+                },
+            )
+
+        return {"answer": answer, "sources": sources}

@@ -1,12 +1,15 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 
 import {
   ArrowUpRight,
   BookOpen,
-  Bot,
+  Building2,
   Database,
+  FileClock,
+  MessagesSquare,
   ShieldCheck,
   Sparkles,
 } from "lucide-react";
@@ -27,6 +30,11 @@ import {
   useWorkspace,
 } from "../../../hooks/use-workspace";
 
+import { listCustomers } from "../../../services/customers.service";
+import { listDocuments } from "../../../services/documents.service";
+import { listConversations } from "../../../services/conversation.service";
+import type { KnowledgeDocument } from "../../../types/document.types";
+
 export default function DashboardPage() {
   const {
     user,
@@ -34,8 +42,6 @@ export default function DashboardPage() {
 
   const {
     activeWorkspace,
-    settings,
-    isSettingsLoading,
   } = useWorkspace();
 
   const firstName =
@@ -44,18 +50,37 @@ export default function DashboardPage() {
       .split(" ")[0] ||
     "there";
 
-  const assistantName =
-    isSettingsLoading
-      ? "Loading assistant"
-      : settings?.assistant_name ||
-        "AI Knowledge Assistant";
-
   const knowledgeEnabled =
     activeWorkspace
       ?.enabled_modules
       .includes(
         "ai_knowledge_assistant"
       ) ?? false;
+
+  const [customerCount, setCustomerCount] = useState(0);
+  const [documentCount, setDocumentCount] = useState(0);
+  const [conversationCount, setConversationCount] = useState(0);
+  const [recentDocuments, setRecentDocuments] = useState<KnowledgeDocument[]>([]);
+
+  useEffect(() => {
+    const workspaceId = activeWorkspace?.id;
+    if (!workspaceId) return;
+    let current = true;
+    void Promise.all([
+      listCustomers(workspaceId),
+      listDocuments(workspaceId),
+      listConversations(workspaceId, 50),
+    ]).then(([customers, documents, conversations]) => {
+      if (!current) return;
+      setCustomerCount(customers.length);
+      setDocumentCount(documents.length);
+      setConversationCount(conversations.length);
+      setRecentDocuments(documents.slice(0, 4));
+    }).catch(() => {
+      // The dashboard remains usable if one summary request fails.
+    });
+    return () => { current = false; };
+  }, [activeWorkspace?.id]);
 
   return (
     <PageTransition className="platform-page dashboard-page">
@@ -108,8 +133,8 @@ export default function DashboardPage() {
             AI Agency transforms documents,
             internal information and
             company context into trusted
-            answers inside one secure,
-            isolated workspace.
+            answers inside one secure
+            company workspace.
           </p>
 
           <div className="dashboard-hero__actions">
@@ -134,13 +159,13 @@ export default function DashboardPage() {
             <span>
               <span className="dashboard-status-dot" />
 
-              System active
+              Ready for questions
             </span>
 
             <span>
               <ShieldCheck size={14} />
 
-              Workspace isolated
+              Customer data protected
             </span>
           </div>
         </div>
@@ -156,21 +181,21 @@ export default function DashboardPage() {
 
           <div className="dashboard-sphere-label dashboard-sphere-label--top">
             <span>
-              System state
+              Customer information
             </span>
 
             <strong>
-              Responsive
+              Ready to explore
             </strong>
           </div>
 
           <div className="dashboard-sphere-label dashboard-sphere-label--bottom">
             <span>
-              Intelligence engine
+              AI assistant
             </span>
 
             <strong>
-              Connected
+              Ready
             </strong>
           </div>
         </div>
@@ -179,57 +204,56 @@ export default function DashboardPage() {
       <section className="dashboard-metrics">
         <article className="dashboard-metric-card">
           <div className="dashboard-metric-card__icon">
+            <Building2 size={19} />
+          </div>
+
+          <div className="dashboard-metric-card__content">
+            <span>
+              Customers
+            </span>
+
+            <strong>
+              {customerCount}
+            </strong>
+          </div>
+
+          <small className="dashboard-metric-card__state">
+            Profiles
+          </small>
+        </article>
+
+        <article className="dashboard-metric-card">
+          <div className="dashboard-metric-card__icon">
             <Database size={19} />
           </div>
 
           <div className="dashboard-metric-card__content">
             <span>
-              Workspace
+              Documents
             </span>
 
             <strong>
-              {activeWorkspace?.name ||
-                "Company workspace"}
+              {documentCount}
             </strong>
           </div>
 
           <small className="dashboard-metric-card__state">
-            Active
+            Indexed
           </small>
         </article>
 
         <article className="dashboard-metric-card">
           <div className="dashboard-metric-card__icon">
-            <Bot size={19} />
+            <MessagesSquare size={19} />
           </div>
 
           <div className="dashboard-metric-card__content">
             <span>
-              Assistant
+              Conversations
             </span>
 
             <strong>
-              {assistantName}
-            </strong>
-          </div>
-
-          <small className="dashboard-metric-card__state">
-            Ready
-          </small>
-        </article>
-
-        <article className="dashboard-metric-card">
-          <div className="dashboard-metric-card__icon">
-            <BookOpen size={19} />
-          </div>
-
-          <div className="dashboard-metric-card__content">
-            <span>
-              Knowledge module
-            </span>
-
-            <strong>
-              AI Knowledge Assistant
+              {conversationCount}
             </strong>
           </div>
 
@@ -243,11 +267,27 @@ export default function DashboardPage() {
               .filter(Boolean)
               .join(" ")}
           >
-            {knowledgeEnabled
-              ? "Enabled"
-              : "Unavailable"}
+            {knowledgeEnabled ? "Available" : "Unavailable"}
           </small>
         </article>
+      </section>
+
+      <section className="dashboard-recent">
+        <div className="dashboard-recent__heading">
+          <div><span className="platform-eyebrow"><FileClock size={14} /> Documents</span><h2>Recent uploads</h2></div>
+          <Link href="/knowledge">View all <ArrowUpRight size={15} /></Link>
+        </div>
+        <div className="dashboard-recent__list">
+          {recentDocuments.length === 0 ? (
+            <p>No documents uploaded yet.</p>
+          ) : recentDocuments.map((document) => (
+            <article key={document.id}>
+              <BookOpen size={17} />
+              <div><strong>{document.name}</strong><span>{document.category} · Ready for the assistant</span></div>
+              <small>{document.status}</small>
+            </article>
+          ))}
+        </div>
       </section>
     </PageTransition>
   );

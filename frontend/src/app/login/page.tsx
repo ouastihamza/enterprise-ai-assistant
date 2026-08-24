@@ -132,7 +132,7 @@ export default function LoginPage() {
             <p>
               Search internal documents, access
               trusted answers and collaborate with
-              secure AI inside one isolated company
+              secure AI inside one private company
               workspace.
             </p>
 
@@ -142,11 +142,11 @@ export default function LoginPage() {
 
                 <span>
                   <strong>
-                    Workspace isolated
+                    Customer data protected
                   </strong>
 
-                  Company data remains separated by
-                  workspace.
+                  Each company sees only its own
+                  information.
                 </span>
               </div>
 

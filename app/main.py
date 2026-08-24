@@ -12,6 +12,7 @@ from app.auth.auth_routes import router as auth_router
 from app.configuration.workspace_settings_routes import (
     router as workspace_settings_router,
 )
+from app.customers.customer_routes import router as customer_router
 from app.workspaces.workspace_routes import (
     router as workspace_router,
 )
@@ -41,6 +42,7 @@ app.include_router(workspace_settings_router)
 app.include_router(assistant_router)
 app.include_router(conversation_router)
 app.include_router(document_router)
+app.include_router(customer_router)
 
 
 @app.get("/")
