@@ -108,6 +108,35 @@ def test_other_user_cannot_list_foreign_workspace_documents(
     assert response.status_code == 403
 
 
+def test_original_document_requires_workspace_access(
+    client, make_user, make_workspace
+):
+    owner = make_user("doc-open-owner")
+    outsider = make_user("doc-open-outsider")
+    workspace = make_workspace(owner)
+    upload = _upload(
+        client,
+        workspace["id"],
+        owner["headers"],
+        "open-me.txt",
+        b"Authorized document content.",
+    )
+    document_id = upload.json()["id"]
+
+    allowed = client.get(
+        f"/workspaces/{workspace['id']}/documents/{document_id}/file",
+        headers=owner["headers"],
+    )
+    denied = client.get(
+        f"/workspaces/{workspace['id']}/documents/{document_id}/file",
+        headers=outsider["headers"],
+    )
+
+    assert allowed.status_code == 200
+    assert allowed.content == b"Authorized document content."
+    assert denied.status_code == 403
+
+
 def test_delete_document_removes_it_from_registry(client, make_user, make_workspace):
     user = make_user("doc-delete")
     workspace = make_workspace(user)

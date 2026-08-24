@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from fastapi import (
     APIRouter,
     Depends,
@@ -7,6 +9,7 @@ from fastapi import (
     UploadFile,
     status,
 )
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 from app.auth.auth_dependencies import get_current_user
@@ -20,6 +23,7 @@ from app.services.document_processing_service import (
     DocumentProcessingService,
 )
 from app.services.document_registry import DocumentRegistry
+from app.services.workspace_storage_service import WorkspaceStorageService
 from app.workspaces.workspace_service import WorkspaceService
 
 
@@ -219,6 +223,36 @@ async def upload_document(
         )
 
     return _to_response(document)
+
+
+@router.get("/{document_id}/file")
+def open_document_file(
+    workspace_id: str,
+    document_id: int,
+    current_user: User = Depends(get_current_user),
+):
+    """Return an original document only after workspace authorization."""
+
+    ensure_workspace_access(current_user=current_user, workspace_id=workspace_id)
+    document = DocumentRegistry(workspace_id).get_document_by_id(document_id)
+    if document is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Document not found.",
+        )
+
+    source_path = Path(str(document["source_file"])).resolve()
+    documents_root = WorkspaceStorageService(workspace_id).get_documents_path().resolve()
+    if not source_path.is_relative_to(documents_root) or not source_path.is_file():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="The original document is unavailable.",
+        )
+    return FileResponse(
+        path=source_path,
+        filename=document["name"],
+        content_disposition_type="inline",
+    )
 
 
 @router.delete(
