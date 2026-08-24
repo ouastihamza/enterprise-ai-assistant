@@ -2,6 +2,7 @@ from fastapi import (
     APIRouter,
     Depends,
     File,
+    Form,
     HTTPException,
     UploadFile,
     status,
@@ -11,6 +12,7 @@ from pydantic import BaseModel
 from app.auth.auth_dependencies import get_current_user
 from app.auth.user_model import User
 from app.auth.user_service import UserService
+from app.customers.customer_service import CustomerService
 from app.services.document_management_service import (
     DocumentManagementService,
 )
@@ -40,6 +42,8 @@ class DocumentResponse(BaseModel):
     uploaded_at: str | None
     last_indexed: str | None
     error_message: str | None
+    customer_id: str | None
+    category: str
 
 
 class _UploadedFileAdapter:
@@ -96,6 +100,8 @@ def _to_response(document: dict) -> DocumentResponse:
         uploaded_at=document["uploaded_at"],
         last_indexed=document["last_indexed"],
         error_message=document.get("error_message"),
+        customer_id=document.get("customer_id"),
+        category=document.get("category") or "Other",
     )
 
 
@@ -105,6 +111,7 @@ def _to_response(document: dict) -> DocumentResponse:
 )
 def list_documents(
     workspace_id: str,
+    customer_id: str | None = None,
     current_user: User = Depends(get_current_user),
 ):
     ensure_workspace_access(
@@ -118,7 +125,7 @@ def list_documents(
 
     return [
         _to_response(document)
-        for document in registry.get_all_documents()
+        for document in registry.get_all_documents(customer_id=customer_id)
     ]
 
 
@@ -130,6 +137,8 @@ def list_documents(
 async def upload_document(
     workspace_id: str,
     file: UploadFile = File(...),
+    customer_id: str | None = Form(default=None),
+    category: str = Form(default="Other"),
     current_user: User = Depends(get_current_user),
 ):
     ensure_workspace_access(
@@ -141,6 +150,19 @@ async def upload_document(
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="The uploaded file has no name.",
+        )
+
+    allowed_categories = {"Contract", "Invoice", "Consumption", "Procedure", "Other"}
+    if category not in allowed_categories:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Unsupported document category.",
+        )
+
+    if customer_id and CustomerService(workspace_id).get_customer(customer_id) is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Customer not found in this workspace.",
         )
 
     registry = DocumentRegistry(
@@ -168,7 +190,9 @@ async def upload_document(
 
     try:
         processing_service.upload_document(
-            adapted_file
+            adapted_file,
+            customer_id=customer_id,
+            category=category,
         )
     except ValueError as error:
         raise HTTPException(

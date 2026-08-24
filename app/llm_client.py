@@ -89,32 +89,36 @@ def ask_llm(
 
     except AuthenticationError:
         return (
-            "Authentication failed. "
-            "Please verify your OpenAI API key."
+            "The assistant is not connected right now. "
+            "Please ask your workspace administrator to check the AI service."
         )
 
     except RateLimitError:
         return (
-            "The OpenAI rate limit has been reached. "
+            "The assistant is busy right now. "
             "Please try again shortly."
         )
 
-    except BadRequestError as error:
+    except BadRequestError:
         return (
-            f"Bad request: {error}"
+            "The assistant could not process that question. "
+            "Please rephrase it and try again."
         )
 
     except APIConnectionError:
         return (
-            "Unable to connect to OpenAI."
+            "The assistant could not connect to the AI service. "
+            "Please try again shortly."
         )
 
     except APIError:
         return (
-            "OpenAI returned an internal error."
+            "The AI service is temporarily unavailable. "
+            "Please try again shortly."
         )
 
-    except Exception as error:
+    except Exception:
         return (
-            f"Unexpected error: {error}"
+            "The assistant could not complete that request. "
+            "Please try again shortly."
         )

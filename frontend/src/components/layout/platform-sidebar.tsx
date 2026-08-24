@@ -3,6 +3,7 @@
 import {
   BookOpen,
   Bot,
+  Building2,
   LayoutDashboard,
   Settings,
   Workflow,
@@ -11,6 +12,11 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const navigation = [
+  {
+    label: "Customers",
+    href: "/customers",
+    icon: Building2,
+  },
   {
     label: "Dashboard",
     href: "/dashboard",
@@ -57,7 +63,7 @@ export function PlatformSidebar() {
         {navigation.map((item) => {
           const Icon = item.icon;
           const isActive =
-            pathname === item.href;
+            pathname === item.href || pathname.startsWith(`${item.href}/`);
 
           if (item.disabled) {
             return (
@@ -90,8 +96,8 @@ export function PlatformSidebar() {
       </nav>
 
       <div className="platform-sidebar__footer">
-        <span>Enterprise AI workspace</span>
-        <small>Secure · Isolated · Modular</small>
+        <span>Private company workspace</span>
+        <small>Customer information in one place</small>
       </div>
     </aside>
   );

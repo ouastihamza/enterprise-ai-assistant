@@ -23,6 +23,8 @@ AI Agency provides an end-to-end workflow for creating an internal knowledge ass
 - Multi-format document ingestion for PDF, DOCX, TXT, Markdown, CSV, XLSX, HTML, JSON, XML, and PPTX files
 - JWT-based authentication with secure user registration and login
 - PostgreSQL-backed storage for users, workspaces, workspace settings, documents, and conversations
+- Workspace-scoped customer profiles and sites, with optional customer/category metadata on documents
+- Customer-aware assistant context combining structured PostgreSQL data with indexed documents
 - Workspace settings for assistant naming, welcome messages, file-type rules, and model configuration
 - Document upload, indexing, and deletion workflows
 - Dashboard, Knowledge, AI Assistant, and Settings pages in the Next.js frontend
@@ -185,7 +187,7 @@ npm run dev
 ## Running with Docker Compose (full stack)
 
 ```bash
-docker compose up --build
+docker compose up --build -d
 ```
 
 This starts:
@@ -195,6 +197,16 @@ This starts:
 - the Next.js frontend on port 3000
 
 The `frontend` service builds `frontend/Dockerfile` with `NEXT_PUBLIC_API_BASE_URL=http://localhost:8000` baked in at build time (see `docker-compose.yml`) so the browser can reach the API. If you deploy this somewhere other than localhost, update that build arg to the API's public URL and rebuild.
+
+### Fictional customer demo
+
+After signing in, open **Customers** and choose **Prepare demo customer**. The idempotent seed action creates the fictional **Demo Industrie SAS** profile, three sites, and four clearly marked fictional documents. The documents pass through the normal ingestion and indexing pipeline.
+
+Open the customer profile, then open **Assistant** (the demo customer is selected automatically) and ask:
+
+> Why was February more expensive than January?
+
+With a valid `OPENAI_API_KEY`, the assistant combines the structured customer profile with the January invoice, February invoice, contract, and consumption documents and returns a grounded response with sources. No real customer or SEFE data is included.
 
 ## API overview
 
@@ -221,8 +233,16 @@ The `frontend` service builds `frontend/Dockerfile` with `NEXT_PUBLIC_API_BASE_U
 ### Documents (`/workspaces/{workspace_id}/documents`)
 
 - `GET /workspaces/{workspace_id}/documents`
-- `POST /workspaces/{workspace_id}/documents` (multipart file upload)
+- `POST /workspaces/{workspace_id}/documents` (multipart file upload; optional `customer_id` and `category` fields)
 - `DELETE /workspaces/{workspace_id}/documents/{document_id}`
+
+### Customers (`/workspaces/{workspace_id}/customers`)
+
+- `GET /workspaces/{workspace_id}/customers`
+- `POST /workspaces/{workspace_id}/customers`
+- `POST /workspaces/{workspace_id}/customers/seed-demo`
+- `GET /workspaces/{workspace_id}/customers/{customer_id}`
+- `POST /workspaces/{workspace_id}/customers/{customer_id}/sites`
 
 ### AI Assistant (`/assistant`)
 

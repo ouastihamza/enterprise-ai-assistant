@@ -214,6 +214,8 @@ class IndexingService:
         optional_text_fields = [
             "heading",
             "sheet_name",
+            "customer_id",
+            "category",
         ]
 
         for field_name in optional_text_fields:

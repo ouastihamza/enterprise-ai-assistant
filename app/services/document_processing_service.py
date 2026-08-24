@@ -1,5 +1,6 @@
 import logging
 import time
+import json
 from pathlib import Path
 from typing import Protocol
 
@@ -68,6 +69,8 @@ class DocumentProcessingService:
     def upload_document(
         self,
         uploaded_file: UploadedDocument,
+        customer_id: str | None = None,
+        category: str = "Other",
     ) -> int | None:
         if self.registry.document_exists(
             uploaded_file.name
@@ -120,6 +123,16 @@ class DocumentProcessingService:
                 overlap=settings.chunk_overlap,
             )
 
+            if customer_id or category != "Other":
+                with chunks_path.open("r", encoding="utf-8") as chunks_file:
+                    chunks = json.load(chunks_file)
+                for chunk in chunks:
+                    if customer_id:
+                        chunk["customer_id"] = customer_id
+                    chunk["category"] = category
+                with chunks_path.open("w", encoding="utf-8") as chunks_file:
+                    json.dump(chunks, chunks_file, ensure_ascii=False, indent=2)
+
             self.knowledge_base.add_chunks_from_file(
                 str(chunks_path)
             )
@@ -134,6 +147,8 @@ class DocumentProcessingService:
                 chunks_file=str(chunks_path),
                 chunk_count=indexed_count,
                 file_size=uploaded_file.size,
+                customer_id=customer_id,
+                category=category,
             )
 
             elapsed = (

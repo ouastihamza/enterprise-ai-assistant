@@ -33,11 +33,11 @@ export function PlatformShell({
         </main>
       ) : !activeWorkspace ? (
         <main className="platform-state">
-          <span>No workspace</span>
-          <h1>Create your first company workspace.</h1>
+          <span>Workspace unavailable</span>
+          <h1>No company workspace is available.</h1>
           <p>
-            Workspace onboarding will be connected in
-            the next checkpoint.
+            Sign out and try again, or ask your workspace
+            administrator for access.
           </p>
         </main>
       ) : (

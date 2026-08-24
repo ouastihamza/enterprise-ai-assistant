@@ -28,11 +28,21 @@ export async function listDocuments(
 
 export async function uploadDocument(
   workspaceId: string,
-  file: File
+  file: File,
+  options?: {
+    customerId?: string;
+    category?: KnowledgeDocument["category"];
+  }
 ): Promise<KnowledgeDocument> {
   try {
     const formData = new FormData();
     formData.append("file", file);
+    if (options?.customerId) {
+      formData.append("customer_id", options.customerId);
+    }
+    if (options?.category) {
+      formData.append("category", options.category);
+    }
 
     const response =
       await api.post<KnowledgeDocument>(

@@ -5,6 +5,7 @@ from app.auth.auth_dependencies import get_current_user
 from app.auth.user_model import User
 from app.auth.user_service import UserService
 from app.conversation import ConversationManager
+from app.customers.customer_service import CustomerService
 from app.services.rag_service import RAGService
 from app.workspaces.workspace_service import WorkspaceService
 
@@ -29,6 +30,7 @@ class AssistantChatRequest(BaseModel):
     )
 
     conversation_id: str | None = None
+    customer_id: str | None = None
 
 
 class AssistantChatResponse(BaseModel):
@@ -85,6 +87,16 @@ def chat_with_knowledge(
         workspace_id=workspace_id,
     )
 
+    customer_context = None
+    if request.customer_id:
+        customer_service = CustomerService(workspace_id)
+        customer_context = customer_service.build_assistant_context(request.customer_id)
+        if customer_context is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Customer not found in this workspace.",
+            )
+
     try:
         conversation_manager = ConversationManager(
             workspace_id=workspace_id,
@@ -109,6 +121,8 @@ def chat_with_knowledge(
         result = (
             rag_service.answer_question_with_sources(
                 question=question,
+                customer_id=request.customer_id,
+                customer_context=customer_context,
             )
         )
 
