@@ -87,7 +87,7 @@ export default function LoginPage() {
     return (
       <main className="auth-loading-screen">
         <div className="auth-loading-screen__mark">
-          V
+          A
         </div>
 
         <p>Preparing your workspace...</p>
@@ -107,13 +107,13 @@ export default function LoginPage() {
         <div className="auth-brand-panel">
           <header className="auth-brand">
             <div className="auth-brand__mark">
-              V
+              A
             </div>
 
             <div>
-              <strong>AI Agency</strong>
+              <strong>ATLAS</strong>
               <span>
-                Enterprise AI Platform
+                Enterprise Intelligence
               </span>
             </div>
           </header>
@@ -125,15 +125,11 @@ export default function LoginPage() {
             </span>
 
             <h1>
-              Put your company&apos;s knowledge
-              <span> into motion.</span>
+              One clear view of every customer.
             </h1>
 
             <p>
-              Search internal documents, access
-              trusted answers and collaborate with
-              secure AI inside one private company
-              workspace.
+              Bring customer details and documents together, then ask Atlas for clear, sourced answers.
             </p>
 
             <div className="auth-capabilities">
@@ -179,7 +175,7 @@ export default function LoginPage() {
           </div>
 
           <footer className="auth-brand-panel__footer">
-            AI Agency · Enterprise AI Platform
+            ATLAS · Enterprise Intelligence
           </footer>
         </div>
 

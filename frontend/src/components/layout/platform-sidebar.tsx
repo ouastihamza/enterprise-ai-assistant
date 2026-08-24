@@ -6,37 +6,30 @@ import {
   Building2,
   LayoutDashboard,
   Settings,
-  Workflow,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const navigation = [
   {
-    label: "Customers",
-    href: "/customers",
-    icon: Building2,
-  },
-  {
     label: "Dashboard",
     href: "/dashboard",
     icon: LayoutDashboard,
   },
   {
-    label: "Knowledge",
+    label: "Customers",
+    href: "/customers",
+    icon: Building2,
+  },
+  {
+    label: "Documents",
     href: "/knowledge",
     icon: BookOpen,
   },
   {
-    label: "Assistant",
+    label: "Ask Atlas",
     href: "/assistant",
     icon: Bot,
-  },
-  {
-    label: "Workflows",
-    href: "/workflows",
-    icon: Workflow,
-    disabled: true,
   },
   {
     label: "Settings",
@@ -51,8 +44,8 @@ export function PlatformSidebar() {
   return (
     <aside className="platform-sidebar">
       <div className="platform-sidebar__brand">
-        <span>V</span>
-        <strong>AI Agency</strong>
+        <span>A</span>
+        <div><strong>ATLAS</strong><small>Enterprise Intelligence</small></div>
       </div>
 
       <nav className="platform-sidebar__navigation">
@@ -64,19 +57,6 @@ export function PlatformSidebar() {
           const Icon = item.icon;
           const isActive =
             pathname === item.href || pathname.startsWith(`${item.href}/`);
-
-          if (item.disabled) {
-            return (
-              <div
-                key={item.label}
-                className="platform-nav-item platform-nav-item--disabled"
-              >
-                <Icon size={18} />
-                <span>{item.label}</span>
-                <small>Soon</small>
-              </div>
-            );
-          }
 
           return (
             <Link
@@ -96,8 +76,8 @@ export function PlatformSidebar() {
       </nav>
 
       <div className="platform-sidebar__footer">
-        <span>Private company workspace</span>
-        <small>Customer information in one place</small>
+        <span>Private workspace</span>
+        <small>Grounded in your customer information</small>
       </div>
     </aside>
   );

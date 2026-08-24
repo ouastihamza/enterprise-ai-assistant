@@ -28,7 +28,7 @@ export function PlatformShell({
       ) : error ? (
         <main className="platform-state">
           <span>Workspace unavailable</span>
-          <h1>AI Agency could not load your workspace.</h1>
+          <h1>Atlas could not load your workspace.</h1>
           <p>{error}</p>
         </main>
       ) : !activeWorkspace ? (
