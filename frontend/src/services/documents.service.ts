@@ -83,3 +83,29 @@ export async function deleteDocument(
     );
   }
 }
+
+export async function openDocument(
+  workspaceId: string,
+  documentId: number,
+  documentName: string
+): Promise<void> {
+  try {
+    const response = await api.get(
+      `/workspaces/${workspaceId}/documents/${documentId}/file`,
+      { responseType: "blob" }
+    );
+    const url = URL.createObjectURL(response.data as Blob);
+    const opened = window.open(url, "_blank", "noopener,noreferrer");
+    if (!opened) {
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = documentName;
+      link.click();
+    }
+    window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  } catch (error) {
+    throw new Error(
+      getApiErrorMessage(error, "Couldn't open that document.")
+    );
+  }
+}

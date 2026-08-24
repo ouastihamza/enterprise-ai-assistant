@@ -2,65 +2,33 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-
 import {
   ArrowUpRight,
-  BookOpen,
   Building2,
-  Database,
-  FileClock,
+  FileText,
   MessagesSquare,
   ShieldCheck,
   Sparkles,
 } from "lucide-react";
 
-import {
-  ParticleSphere,
-} from "../../../components/effects/particle-sphere";
-
-import {
-  PageTransition,
-} from "../../../components/layout/page-transition";
-
-import {
-  useAuth,
-} from "../../../hooks/use-auth";
-
-import {
-  useWorkspace,
-} from "../../../hooks/use-workspace";
-
+import { PageTransition } from "../../../components/layout/page-transition";
+import { useAuth } from "../../../hooks/use-auth";
+import { useWorkspace } from "../../../hooks/use-workspace";
 import { listCustomers } from "../../../services/customers.service";
 import { listDocuments } from "../../../services/documents.service";
 import { listConversations } from "../../../services/conversation.service";
+import type { Customer } from "../../../types/customer.types";
 import type { KnowledgeDocument } from "../../../types/document.types";
 
 export default function DashboardPage() {
-  const {
-    user,
-  } = useAuth();
-
-  const {
-    activeWorkspace,
-  } = useWorkspace();
-
-  const firstName =
-    user?.full_name
-      ?.trim()
-      .split(" ")[0] ||
-    "there";
-
-  const knowledgeEnabled =
-    activeWorkspace
-      ?.enabled_modules
-      .includes(
-        "ai_knowledge_assistant"
-      ) ?? false;
-
-  const [customerCount, setCustomerCount] = useState(0);
+  const { user } = useAuth();
+  const { activeWorkspace } = useWorkspace();
+  const firstName = user?.full_name?.trim().split(" ")[0] || "there";
+  const [customers, setCustomers] = useState<Customer[]>([]);
   const [documentCount, setDocumentCount] = useState(0);
   const [conversationCount, setConversationCount] = useState(0);
   const [recentDocuments, setRecentDocuments] = useState<KnowledgeDocument[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const workspaceId = activeWorkspace?.id;
@@ -70,224 +38,88 @@ export default function DashboardPage() {
       listCustomers(workspaceId),
       listDocuments(workspaceId),
       listConversations(workspaceId, 50),
-    ]).then(([customers, documents, conversations]) => {
-      if (!current) return;
-      setCustomerCount(customers.length);
-      setDocumentCount(documents.length);
-      setConversationCount(conversations.length);
-      setRecentDocuments(documents.slice(0, 4));
-    }).catch(() => {
-      // The dashboard remains usable if one summary request fails.
-    });
-    return () => { current = false; };
+    ])
+      .then(([customerItems, documents, conversations]) => {
+        if (!current) return;
+        setCustomers(customerItems);
+        setDocumentCount(documents.length);
+        setConversationCount(conversations.length);
+        setRecentDocuments(documents.slice(0, 4));
+      })
+      .finally(() => {
+        if (current) setIsLoading(false);
+      });
+    return () => {
+      current = false;
+    };
   }, [activeWorkspace?.id]);
 
+  const featuredCustomer =
+    customers.find((customer) => customer.company_name === "Demo Industrie SAS") ||
+    customers[0];
+
   return (
-    <PageTransition className="platform-page dashboard-page">
-      <section className="dashboard-intro">
+    <PageTransition className="platform-page dashboard-page atlas-dashboard">
+      <section className="dashboard-intro atlas-dashboard__intro">
         <div>
-          <span className="platform-eyebrow">
-            <Sparkles size={14} />
-
-            Workspace intelligence
-          </span>
-
-          <h1>
-            Welcome back,
-            <span>
-              {" "}
-              {firstName}.
-            </span>
-          </h1>
+          <span className="platform-eyebrow"><Sparkles size={14} /> Workspace overview</span>
+          <h1>Good to see you, {firstName}.</h1>
+          <p>Customer information, documents and grounded answers in one secure workspace.</p>
         </div>
-
-        <p>
-          Your secure company workspace
-          is connected and ready.
-        </p>
+        <Link href="/assistant" className="dashboard-primary-action">
+          Ask Atlas <ArrowUpRight size={17} />
+        </Link>
       </section>
 
-      <section className="dashboard-hero">
-        <div className="dashboard-hero__grid" />
-
-        <div className="dashboard-hero__ambient dashboard-hero__ambient--one" />
-
-        <div className="dashboard-hero__ambient dashboard-hero__ambient--two" />
-
-        <div className="dashboard-hero__content">
-          <span className="dashboard-hero__company">
-            {activeWorkspace
-              ?.company_name ||
-              "Company workspace"}
-          </span>
-
-          <h2>
-            Company knowledge,
-            <span>
-              {" "}
-              alive and in motion.
-            </span>
-          </h2>
-
-          <p>
-            AI Agency transforms documents,
-            internal information and
-            company context into trusted
-            answers inside one secure
-            company workspace.
-          </p>
-
-          <div className="dashboard-hero__actions">
-            <Link
-              href="/assistant"
-              className="dashboard-primary-action"
-            >
-              Open assistant
-
-              <ArrowUpRight size={17} />
-            </Link>
-
-            <Link
-              href="/knowledge"
-              className="dashboard-secondary-action"
-            >
-              Explore knowledge
-            </Link>
-          </div>
-
-          <div className="dashboard-hero__status">
-            <span>
-              <span className="dashboard-status-dot" />
-
-              Ready for questions
-            </span>
-
-            <span>
-              <ShieldCheck size={14} />
-
-              Customer data protected
-            </span>
-          </div>
-        </div>
-
-        <div className="dashboard-hero__visual">
-          <div className="dashboard-sphere-aura" />
-
-          <ParticleSphere />
-
-          <div className="dashboard-interface-line dashboard-interface-line--one" />
-
-          <div className="dashboard-interface-line dashboard-interface-line--two" />
-
-          <div className="dashboard-sphere-label dashboard-sphere-label--top">
-            <span>
-              Customer information
-            </span>
-
-            <strong>
-              Ready to explore
-            </strong>
-          </div>
-
-          <div className="dashboard-sphere-label dashboard-sphere-label--bottom">
-            <span>
-              AI assistant
-            </span>
-
-            <strong>
-              Ready
-            </strong>
-          </div>
-        </div>
+      <section className="atlas-metrics" aria-label="Workspace metrics">
+        <article><span>Customers</span><strong>{isLoading ? "—" : customers.length}</strong><Building2 size={18} /></article>
+        <article><span>Documents</span><strong>{isLoading ? "—" : documentCount}</strong><FileText size={18} /></article>
+        <article><span>Conversations</span><strong>{isLoading ? "—" : conversationCount}</strong><MessagesSquare size={18} /></article>
       </section>
 
-      <section className="dashboard-metrics">
-        <article className="dashboard-metric-card">
-          <div className="dashboard-metric-card__icon">
-            <Building2 size={19} />
+      <section className="atlas-dashboard__grid">
+        <article className="atlas-panel atlas-customer-focus">
+          <div className="atlas-panel__heading">
+            <div><span>Customer focus</span><h2>{featuredCustomer?.company_name || "No customer selected"}</h2></div>
+            <Building2 size={20} />
           </div>
-
-          <div className="dashboard-metric-card__content">
-            <span>
-              Customers
-            </span>
-
-            <strong>
-              {customerCount}
-            </strong>
-          </div>
-
-          <small className="dashboard-metric-card__state">
-            Profiles
-          </small>
+          {featuredCustomer ? (
+            <>
+              <dl>
+                <div><dt>Reference</dt><dd>{featuredCustomer.customer_reference}</dd></div>
+                <div><dt>Industry</dt><dd>{featuredCustomer.industry || "Not specified"}</dd></div>
+                <div><dt>Sites</dt><dd>{featuredCustomer.site_count}</dd></div>
+                <div><dt>Status</dt><dd>{featuredCustomer.status}</dd></div>
+              </dl>
+              <div className="atlas-panel__actions">
+                <Link href={`/customers/${featuredCustomer.id}`}>Open customer</Link>
+                <Link href={`/assistant?customer=${featuredCustomer.id}`}>Ask Atlas</Link>
+              </div>
+            </>
+          ) : (
+            <p className="atlas-panel__empty">Add a customer to bring company details and documents together.</p>
+          )}
         </article>
 
-        <article className="dashboard-metric-card">
-          <div className="dashboard-metric-card__icon">
-            <Database size={19} />
+        <article className="atlas-panel atlas-recent-documents">
+          <div className="atlas-panel__heading">
+            <div><span>Knowledge base</span><h2>Recent documents</h2></div>
+            <ShieldCheck size={20} />
           </div>
-
-          <div className="dashboard-metric-card__content">
-            <span>
-              Documents
-            </span>
-
-            <strong>
-              {documentCount}
-            </strong>
-          </div>
-
-          <small className="dashboard-metric-card__state">
-            Indexed
-          </small>
+          {recentDocuments.length > 0 ? (
+            <div className="atlas-document-list">
+              {recentDocuments.map((document) => (
+                <div key={document.id}>
+                  <FileText size={16} />
+                  <span><strong>{document.name}</strong><small>{document.category} · {document.status}</small></span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="atlas-panel__empty">Uploaded and indexed documents will appear here.</p>
+          )}
+          <Link href="/knowledge" className="atlas-panel__link">View all documents <ArrowUpRight size={15} /></Link>
         </article>
-
-        <article className="dashboard-metric-card">
-          <div className="dashboard-metric-card__icon">
-            <MessagesSquare size={19} />
-          </div>
-
-          <div className="dashboard-metric-card__content">
-            <span>
-              Conversations
-            </span>
-
-            <strong>
-              {conversationCount}
-            </strong>
-          </div>
-
-          <small
-            className={[
-              "dashboard-metric-card__state",
-              !knowledgeEnabled
-                ? "dashboard-metric-card__state--disabled"
-                : "",
-            ]
-              .filter(Boolean)
-              .join(" ")}
-          >
-            {knowledgeEnabled ? "Available" : "Unavailable"}
-          </small>
-        </article>
-      </section>
-
-      <section className="dashboard-recent">
-        <div className="dashboard-recent__heading">
-          <div><span className="platform-eyebrow"><FileClock size={14} /> Documents</span><h2>Recent uploads</h2></div>
-          <Link href="/knowledge">View all <ArrowUpRight size={15} /></Link>
-        </div>
-        <div className="dashboard-recent__list">
-          {recentDocuments.length === 0 ? (
-            <p>No documents uploaded yet.</p>
-          ) : recentDocuments.map((document) => (
-            <article key={document.id}>
-              <BookOpen size={17} />
-              <div><strong>{document.name}</strong><span>{document.category} · Ready for the assistant</span></div>
-              <small>{document.status}</small>
-            </article>
-          ))}
-        </div>
       </section>
     </PageTransition>
   );

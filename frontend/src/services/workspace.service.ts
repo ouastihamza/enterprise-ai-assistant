@@ -7,7 +7,7 @@ import type {
 } from "../types/workspace.types";
 
 const DEFAULT_WORKSPACE_SETTINGS: WorkspaceSettings = {
-  assistant_name: "AI Knowledge Assistant",
+  assistant_name: "Atlas Assistant",
   company_logo: "",
   primary_color: "#8d74d8",
   theme: "default",

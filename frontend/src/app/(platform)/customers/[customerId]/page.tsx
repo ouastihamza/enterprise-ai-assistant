@@ -11,11 +11,9 @@ import {
   FileText,
   Gauge,
   Loader2,
-  Mail,
   MapPin,
   ReceiptText,
   UploadCloud,
-  UserRound,
   Zap,
 } from "lucide-react";
 
@@ -87,17 +85,18 @@ export default function CustomerProfilePage() {
       <section className="customer-profile__hero">
         <div className="customer-profile__identity">
           <div className="customer-profile__logo"><Building2 size={26} /></div>
-          <div><div className="customer-profile__kicker"><span className="customer-status">{customer.status}</span> {customer.customer_reference}</div><h1>{customer.company_name}</h1><p>{customer.industry || "Industry not specified"}</p></div>
+          <div><div className="customer-profile__kicker"><span className="customer-status">{customer.status}</span> {customer.customer_reference}</div><h1>{customer.company_name}</h1><p>{customer.industry || "Industry not specified"} · {customer.contact_name || "No primary contact"} · {customer.email || "No email"}</p></div>
         </div>
-        <Link href={`/assistant?customer=${customer.id}`} className="customer-button"><Bot size={16} /> Ask about this customer</Link>
+        <Link href={`/assistant?customer=${customer.id}`} className="customer-button"><Bot size={16} /> Ask Atlas</Link>
       </section>
 
       {error && <div className="customer-alert">{error}</div>}
 
       <section className="customer-profile__facts">
-        <article><UserRound size={18} /><span>Primary contact</span><strong>{customer.contact_name || "Not set"}</strong><small><Mail size={13} /> {customer.email || "No email"}</small></article>
         <article><MapPin size={18} /><span>Sites</span><strong>{customer.sites.length}</strong><small>{customer.sites.map((site) => site.city).join(" · ") || "No sites"}</small></article>
         <article><Gauge size={18} /><span>Annual consumption</span><strong>{customer.sites.reduce((sum, site) => sum + (site.annual_consumption_mwh || 0), 0).toLocaleString()} MWh</strong><small>Across associated sites</small></article>
+        <article><ReceiptText size={18} /><span>Latest invoice</span><strong>{customer.latest_invoice_summary?.match(/€[\d,]+/)?.[0] || "—"}</strong><small>February 2026</small></article>
+        <article><CalendarRange size={18} /><span>Contract</span><strong>Current</strong><small>Through December 2028</small></article>
       </section>
 
       <section className="customer-summary-grid">

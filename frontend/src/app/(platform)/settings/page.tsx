@@ -298,7 +298,7 @@ export default function SettingsPage() {
                   event.target.value
                 )
               }
-              placeholder="AI Knowledge Assistant"
+              placeholder="Atlas Assistant"
             />
           </label>
 

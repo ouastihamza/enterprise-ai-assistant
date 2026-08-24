@@ -11,11 +11,14 @@ import {
   ArrowUp,
   Building2,
   ChevronDown,
+  Copy,
   FileText,
   Loader2,
   MessageSquare,
   Plus,
+  RefreshCw,
   Sparkles,
+  Square,
   User,
 } from "lucide-react";
 
@@ -33,9 +36,10 @@ import {
 } from "../../../hooks/use-workspace";
 
 import {
-  sendAssistantMessage,
+  streamAssistantMessage,
   type AssistantSource,
 } from "../../../services/assistant.service";
+import { openDocument } from "../../../services/documents.service";
 
 import {
   createConversation,
@@ -57,6 +61,7 @@ type ChatMessage = {
   content: string;
   sources?: AssistantSource[];
   isError?: boolean;
+  isStreaming?: boolean;
 };
 
 function makeId(): string {
@@ -268,8 +273,10 @@ function formatConversationDate(
 
 function SourcesList({
   sources,
+  workspaceId,
 }: {
   sources: AssistantSource[];
+  workspaceId?: string;
 }) {
   const [
     isPanelOpen,
@@ -282,6 +289,8 @@ function SourcesList({
   ] = useState<number | null>(
     null
   );
+
+  const [openError, setOpenError] = useState<string | null>(null);
 
   const sortedSources = [
     ...sources,
@@ -380,6 +389,12 @@ function SourcesList({
                       </strong>
 
                       <div className="assistant-source-row-meta">
+                        {source.category && (
+                          <span>{source.category}</span>
+                        )}
+
+                        {source.category && (location || score) && <span>•</span>}
+
                         {location && (
                           <span>
                             {
@@ -403,6 +418,12 @@ function SourcesList({
                           </span>
                         )}
                       </div>
+
+                      {source.customer_name && (
+                        <span className="assistant-source-customer">
+                          {source.customer_name}
+                        </span>
+                      )}
                     </div>
 
                     <ChevronDown
@@ -433,11 +454,37 @@ function SourcesList({
                         {source.preview ??
                           "No preview available."}
                       </blockquote>
+
+                      {source.document_id != null && workspaceId && (
+                        <button
+                          type="button"
+                          className="assistant-source-open"
+                          onClick={() => {
+                            setOpenError(null);
+                            void openDocument(
+                              workspaceId,
+                              source.document_id as number,
+                              source.document_name
+                            ).catch((error) => {
+                              setOpenError(
+                                error instanceof Error
+                                  ? error.message
+                                  : "Couldn't open that document."
+                              );
+                            });
+                          }}
+                        >
+                          Open original
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>
               );
             }
+          )}
+          {openError && (
+            <p className="assistant-source-error">{openError}</p>
           )}
         </div>
       )}
@@ -451,13 +498,11 @@ export default function AssistantPage() {
     settings,
   } = useWorkspace();
 
-  const assistantName =
-    settings?.assistant_name ||
-    "Knowledge Assistant";
+  const assistantName = "Atlas Assistant";
 
   const welcomeMessage =
     settings?.welcome_message ||
-    "Ask questions about your company documents.";
+    "Ask Atlas about customer profiles, contracts, invoices and consumption.";
 
   const workspaceId =
     activeWorkspace?.id;
@@ -515,6 +560,9 @@ export default function AssistantPage() {
     isSending,
     setIsSending,
   ] = useState(false);
+
+  const [streamStatus, setStreamStatus] = useState("Preparing answer…");
+  const activeRequestRef = useRef<AbortController | null>(null);
 
   const [
     isLoadingConversation,
@@ -992,10 +1040,114 @@ export default function AssistantPage() {
     )}px`;
   };
 
-  const sendMessage = async () => {
-    const question =
-      input.trim();
+  const runAssistantStream = async ({
+    question,
+    assistantMessageId,
+    regenerate = false,
+    fallbackContent = "",
+  }: {
+    question: string;
+    assistantMessageId: string;
+    regenerate?: boolean;
+    fallbackContent?: string;
+  }) => {
+    if (!workspaceId) return;
+    const controller = new AbortController();
+    activeRequestRef.current = controller;
+    setIsSending(true);
+    setStreamStatus("Searching customer information…");
 
+    try {
+      await streamAssistantMessage(
+        {
+          workspace_id: workspaceId,
+          question,
+          conversation_id: conversationId,
+          customer_id: selectedCustomerId || null,
+          regenerate,
+        },
+        (event) => {
+          if (event.type === "start") {
+            setConversationId(event.conversation_id);
+          } else if (event.type === "status") {
+            setStreamStatus(event.message);
+          } else if (event.type === "metadata") {
+            setMessages((current) =>
+              current.map((message) =>
+                message.id === assistantMessageId
+                  ? { ...message, sources: event.sources }
+                  : message
+              )
+            );
+          } else if (event.type === "delta") {
+            setStreamStatus("Writing grounded answer…");
+            setMessages((current) =>
+              current.map((message) =>
+                message.id === assistantMessageId
+                  ? {
+                      ...message,
+                      content: message.content + event.delta,
+                      isStreaming: true,
+                    }
+                  : message
+              )
+            );
+          } else if (event.type === "complete") {
+            setConversationId(event.conversation_id);
+            setMessages((current) =>
+              current.map((message) =>
+                message.id === assistantMessageId
+                  ? {
+                      ...message,
+                      content: event.answer || message.content,
+                      sources: event.sources,
+                      isStreaming: false,
+                    }
+                  : message
+              )
+            );
+          } else if (event.type === "error") {
+            throw new Error(event.message);
+          }
+        },
+        controller.signal
+      );
+      try {
+        await refreshConversationList();
+      } catch {
+        // The answer remains usable if only the sidebar refresh fails.
+      }
+    } catch (error) {
+      const wasStopped =
+        error instanceof DOMException && error.name === "AbortError";
+      setMessages((current) =>
+        current.map((message) =>
+          message.id === assistantMessageId
+            ? {
+                ...message,
+                content:
+                  message.content ||
+                  fallbackContent ||
+                  (wasStopped
+                    ? "Generation stopped."
+                    : error instanceof Error
+                      ? error.message
+                      : "Atlas could not complete this request."),
+                isError: !wasStopped && !fallbackContent,
+                isStreaming: false,
+              }
+            : message
+        )
+      );
+    } finally {
+      activeRequestRef.current = null;
+      setIsSending(false);
+      requestAnimationFrame(() => textareaRef.current?.focus());
+    }
+  };
+
+  const sendMessage = async () => {
+    const question = input.trim();
     if (
       !question ||
       isSending ||
@@ -1007,84 +1159,47 @@ export default function AssistantPage() {
       return;
     }
 
-    const userMessage: ChatMessage =
-      {
-        id: makeId(),
-        role: "user",
-        content: question,
-      };
-
+    const assistantMessageId = makeId();
     setInput("");
-    setIsSending(true);
     setConversationLoadError(null);
-
     shouldAutoScrollRef.current = true;
-
-    requestAnimationFrame(() => {
-      resizeTextarea();
-    });
-
+    requestAnimationFrame(resizeTextarea);
     setMessages((current) => [
       ...current,
-      userMessage,
+      { id: makeId(), role: "user", content: question },
+      {
+        id: assistantMessageId,
+        role: "assistant",
+        content: "",
+        isStreaming: true,
+      },
     ]);
+    await runAssistantStream({ question, assistantMessageId });
+  };
 
-    try {
-      const response =
-        await sendAssistantMessage(
-          {
-            workspace_id:
-              workspaceId,
-            question,
-            conversation_id:
-              conversationId,
-            customer_id: selectedCustomerId || null,
-          }
-        );
-
-      setConversationId(
-        response.conversation_id
-      );
-
-      setMessages((current) => [
-        ...current,
-        {
-          id: makeId(),
-          role: "assistant",
-          content:
-            response.answer ||
-            "I couldn't find that in the available documents.",
-          sources:
-            response.sources ||
-            [],
-        },
-      ]);
-
-      try {
-        await refreshConversationList();
-      } catch {
-        // The answer succeeded, so a sidebar
-        // refresh failure should not replace it.
-      }
-    } catch (error) {
-      setMessages((current) => [
-        ...current,
-        {
-          id: makeId(),
-          role: "assistant",
-          content:
-            error instanceof Error
-              ? error.message
-              : "The assistant could not complete this request.",
-          isError: true,
-        },
-      ]);
-    } finally {
-      setIsSending(false);
-      requestAnimationFrame(() => {
-        textareaRef.current?.focus();
-      });
-    }
+  const regenerateLastAnswer = async () => {
+    if (isSending || !conversationId) return;
+    const assistantIndex = messages.findLastIndex(
+      (message) => message.role === "assistant" && !message.isError
+    );
+    const userMessage = [...messages.slice(0, assistantIndex)]
+      .reverse()
+      .find((message) => message.role === "user");
+    if (assistantIndex < 0 || !userMessage) return;
+    const assistantMessage = messages[assistantIndex];
+    setMessages((current) =>
+      current.map((message) =>
+        message.id === assistantMessage.id
+          ? { ...message, content: "", sources: [], isStreaming: true }
+          : message
+      )
+    );
+    await runAssistantStream({
+      question: userMessage.content,
+      assistantMessageId: assistantMessage.id,
+      regenerate: true,
+      fallbackContent: assistantMessage.content,
+    });
   };
 
   const handleKeyDown = (
@@ -1342,7 +1457,7 @@ export default function AssistantPage() {
 
             {!isLoadingConversation &&
               messages.map(
-                (message) => (
+                (message, messageIndex) => (
                   <div
                     key={message.id}
                     className={[
@@ -1382,6 +1497,11 @@ export default function AssistantPage() {
                               }
                             </span>
                           </div>
+                        ) : message.isStreaming && !message.content ? (
+                          <div className="assistant-bubble__status">
+                            <Loader2 size={14} className="assistant-spin" />
+                            <span>{streamStatus}</span>
+                          </div>
                         ) : (
                           <div className="assistant-markdown">
                             <ReactMarkdown
@@ -1411,28 +1531,39 @@ export default function AssistantPage() {
                             sources={
                               message.sources
                             }
+                            workspaceId={workspaceId}
                           />
+                        )}
+
+                      {message.role === "assistant" &&
+                        !message.isError &&
+                        !message.isStreaming &&
+                        message.content && (
+                          <div className="assistant-message-actions">
+                            <button
+                              type="button"
+                              onClick={() => void navigator.clipboard.writeText(message.content)}
+                              aria-label="Copy answer"
+                            >
+                              <Copy size={13} /> Copy
+                            </button>
+                            {messageIndex === messages.length - 1 && (
+                              <button
+                                type="button"
+                                onClick={() => void regenerateLastAnswer()}
+                                disabled={isSending}
+                                aria-label="Regenerate answer"
+                              >
+                                <RefreshCw size={13} /> Regenerate
+                              </button>
+                            )}
+                          </div>
                         )}
                     </div>
                   </div>
                 )
               )}
 
-            {isSending && (
-              <div className="assistant-message assistant-message--assistant">
-                <AssistantAvatar />
-
-                <div className="assistant-message__body">
-                  <div className="assistant-bubble assistant-bubble--thinking">
-                    <Loader2
-                      size={14}
-                      className="assistant-spin"
-                    />
-                    <span>Thinking...</span>
-                  </div>
-                </div>
-              </div>
-            )}
           </div>
 
           <div className="assistant-composer">
@@ -1471,12 +1602,15 @@ export default function AssistantPage() {
 
               <button
                 type="button"
-                className="assistant-send-button"
-                onClick={() => void sendMessage()}
-                disabled={composerDisabled || !input.trim()}
-                aria-label="Send message"
+                className={isSending ? "assistant-send-button assistant-send-button--stop" : "assistant-send-button"}
+                onClick={() => {
+                  if (isSending) activeRequestRef.current?.abort();
+                  else void sendMessage();
+                }}
+                disabled={!isSending && (composerDisabled || !input.trim())}
+                aria-label={isSending ? "Stop generating" : "Send message"}
               >
-                <ArrowUp size={16} />
+                {isSending ? <Square size={14} /> : <ArrowUp size={16} />}
               </button>
             </div>
           </div>

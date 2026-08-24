@@ -62,7 +62,7 @@ export function LoginForm() {
           );
         } else if (!requestError.response) {
           setError(
-            "AI Agency could not reach the platform API. Check that the backend is running."
+            "Atlas could not reach the platform. Please try again shortly."
           );
         } else {
           setError(
@@ -197,7 +197,7 @@ export function LoginForm() {
         <span>
           {isSubmitting
             ? "Opening workspace"
-            : "Enter AI Agency"}
+            : "Enter Atlas"}
         </span>
 
         {isSubmitting ? (
