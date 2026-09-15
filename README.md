@@ -1,275 +1,107 @@
-# AI Agency
+# Enterprise AI Assistant
 
-AI Agency is a full-stack internal knowledge assistant platform that lets teams upload company documents, process them into a searchable knowledge base, and ask questions grounded in their content. The project combines a FastAPI backend, a Next.js frontend, PostgreSQL persistence, ChromaDB vector search, and a modular document-processing pipeline.
+A workspace-based knowledge assistant prototype for teams that want to upload internal documents and ask questions with retrieved sources.
 
-It is designed for organizations that want a self-hosted, workspace-aware AI assistant for internal documents without depending on a fully managed SaaS solution.
+## Problem
 
-## What this project does
+Answers to internal questions are spread across files. This project extracts their text, indexes it for semantic search and passes matching passages to an answer model. Users can inspect the returned document names, relevance scores and text previews.
 
-AI Agency provides an end-to-end workflow for creating an internal knowledge assistant:
+## Stack
 
-- create and manage isolated workspaces for teams or companies
-- upload documents in multiple formats
-- extract and normalize text from files
-- split content into chunks for retrieval
-- generate embeddings and index them in ChromaDB
-- perform semantic search for relevant context
-- answer questions with RAG-style grounded responses
-- expose the experience through a Next.js UI backed by a FastAPI API
+- Python 3.11, FastAPI, Pydantic and raw `psycopg2` database access.
+- Next.js 16, React 19 and TypeScript in `frontend/`.
+- PostgreSQL 15 for users, workspaces, settings, document records and conversations.
+- Sentence Transformers with local `BAAI/bge-m3` embeddings; persistent ChromaDB for vector search.
+- OpenAI for answer generation, JWT authentication, bcrypt, Docker Compose and pytest.
 
-## Core features
-
-- Workspace-based isolation for different clients or teams
-- Multi-format document ingestion for PDF, DOCX, TXT, Markdown, CSV, XLSX, HTML, JSON, XML, and PPTX files
-- JWT-based authentication with secure user registration and login
-- PostgreSQL-backed storage for users, workspaces, workspace settings, documents, and conversations
-- Workspace settings for assistant naming, welcome messages, file-type rules, and model configuration
-- Document upload, indexing, and deletion workflows
-- Dashboard, Knowledge, AI Assistant, and Settings pages in the Next.js frontend
-- Docker support for local deployment and development
-
-## Architecture overview
-
-The application follows a modular service-oriented design:
-
-- Frontend: Next.js (React 19) UI under `frontend/`
-- Backend: FastAPI API for authentication, workspace operations, workspace settings, documents, conversations, and the AI assistant
-- Services: reusable modules for document processing, chunking, embedding, indexing, vector search, and RAG
-- Storage: workspace-specific files and processed artifacts stored on disk under `storage/`
-- Vector database: ChromaDB for semantic retrieval, one collection per workspace
-- Database: PostgreSQL for all application state (users, workspaces, workspace settings, documents, conversations) — there is no ORM or migration tool; each service creates its own table with `CREATE TABLE IF NOT EXISTS` on startup
-
-A typical workflow looks like this:
-
-1. A user registers or signs in.
-2. A workspace is created (a first-time user with no workspace gets one auto-created).
-3. Documents are uploaded into the workspace.
-4. The files are parsed and cleaned.
-5. Text is chunked and embedded (locally, via `sentence-transformers`).
-6. The vectors are indexed into ChromaDB.
-7. The user asks a question and receives an answer grounded in retrieved context, with cited sources.
-
-## Tech stack
-
-**Backend**
-- Python 3.11+
-- FastAPI, uvicorn
-- PostgreSQL 15 (raw `psycopg2`, no ORM)
-- ChromaDB
-- Sentence Transformers (`BAAI/bge-m3`, run locally)
-- OpenAI (`gpt-5.5` by default)
-- JWT authentication (`python-jose`, HS256), `bcrypt` password hashing
-
-**Frontend**
-- Next.js 16, React 19
-- axios, framer-motion, lucide-react, react-markdown
-
-**Infra**
-- Docker / Docker Compose
-
-## Repository structure
+## Architecture
 
 ```text
-AI-agency/
-├── app/
-│   ├── auth/                      # registration, login, JWT, user model/service
-│   ├── configuration/             # per-workspace settings (chunk size, model, etc.)
-│   ├── conversation/               # conversation + message persistence
-│   ├── workspaces/                 # workspace model, service, routes
-│   ├── api/                        # document, assistant, conversation routes
-│   ├── services/                   # document processing, chunking, embedding,
-│   │                                # indexing, vector search, RAG, file readers
-│   ├── config.py                   # env var loading
-│   ├── main.py                     # FastAPI app + router wiring
-│   ├── llm_client.py                # shared OpenAI call wrapper
-│   └── prompts.py
-├── frontend/                       # Next.js app (App Router)
-├── scripts/                        # process_document.py: the ingestion pipeline entrypoint
-├── storage/                        # per-workspace files, chunks, and the Chroma DB (gitignored)
-├── tests/                          # pytest suite (see Testing below)
-├── docker-compose.yml
-├── Dockerfile                      # backend image
-├── frontend/Dockerfile             # frontend image
-├── requirements.txt
-└── README.md
+Next.js interface --> FastAPI --> PostgreSQL application records
+                         |
+Upload --> file reader --> text chunks --> local embeddings --> ChromaDB
+Question --> local embedding --> workspace collection --> retrieved passages
+                                                              |
+                                                         OpenAI answer
+                                                              |
+                                                   answer + source metadata
 ```
 
-## Prerequisites
+`app/services/` handles extraction, indexing, retrieval and document lifecycle operations. Each workspace gets a Chroma collection and a directory under `storage/workspaces/`. API routes check workspace access. Files, processed text, vectors and model downloads stay under `storage/` by default; relational records are in PostgreSQL.
 
-- Python 3.11 or newer
-- Node.js 20+ and npm (for the frontend)
-- pip
-- Docker Desktop and Docker Compose (recommended for local development)
-- An OpenAI API key (the app boots and most features work without one; only LLM answer generation needs a real key — see below)
+Embeddings run locally. Questions and retrieved passages are sent to OpenAI for generation. The current answer path does not send saved conversation history to the model.
 
-## Environment configuration
+## Run locally
 
-Copy `.env.example` to `.env` in the project root and fill it in:
+Use Docker with Compose v2 and Linux containers. The images provide Python 3.11 and Node.js 22. You need an OpenAI API key with access to your selected model, network access to download the embedding model, and free ports 3000, 8000 and 5432. The model and Python dependencies make the initial download substantial.
 
-```bash
+```sh
+git clone https://github.com/ouastihamza/enterprise-ai-assistant.git
+cd enterprise-ai-assistant
 cp .env.example .env
+openssl rand -hex 32
 ```
 
-```env
-# --- OpenAI ---
-OPENAI_API_KEY=your_api_key_here
-OPENAI_MODEL=gpt-5.5
-TEMPERATURE=0.2
+Set `JWT_SECRET_KEY` to the generated value and fill in `OPENAI_API_KEY` in `.env`. Keep the other database defaults for the supplied Compose setup. Do not commit `.env`.
 
-# --- Auth ---
-# Generate with: python -c "import secrets; print(secrets.token_hex(32))"
-JWT_SECRET_KEY=replace_with_a_random_hex_string
-JWT_ALGORITHM=HS256
+| Variable | Purpose / default |
+| --- | --- |
+| `OPENAI_API_KEY` | A nonempty value is needed to initialize the client; a valid key is needed for real answers. |
+| `JWT_SECRET_KEY` | Required token signing secret. |
+| `OPENAI_MODEL`, `TEMPERATURE` | Shared client defaults: `gpt-5.5`, `0.2`. Workspace settings select the model and temperature used by chat. |
+| `JWT_ALGORITHM` | `HS256`. |
+| `DB_HOST`, `DB_PORT` | `db`, `5432`; Compose overrides the host to `db`. |
+| `DB_NAME`, `DB_USER`, `DB_PASSWORD` | Local development defaults matching the Compose database service. |
+| `DATABASE_URL` | Optional full connection string; overrides the individual database fields. Omit for the standard setup. |
+| `VECTOR_DB_PATH` | Optional path; omit to use `storage/vector_db`. Do not set it to an empty value. |
+| `HF_HOME` | Optional embedding-model cache location; defaults to `storage/huggingface`. |
+| `NEXT_PUBLIC_API_BASE_URL` | Browser-visible API URL, set to `http://localhost:8000` as a frontend build argument in Compose. |
 
-# --- PostgreSQL ---
-# Defaults below match docker-compose.yml's db service. If you run the
-# API outside Docker against that same container, set DB_HOST=localhost.
-DB_HOST=db
-DB_PORT=5432
-DB_NAME=ai_agency
-DB_USER=ai_user
-DB_PASSWORD=ai_secure_password
-
-# --- Vector store ---
-# Defaults to <project_root>/storage/vector_db if unset.
-VECTOR_DB_PATH=
-```
-
-The app boots without a real `OPENAI_API_KEY` — a missing or invalid key only surfaces when you actually ask the assistant a question (it returns a clear "Authentication failed" message instead of crashing). Everything else — auth, workspaces, document upload/indexing, vector retrieval, citations — works independently of OpenAI.
-
-For the frontend, copy `frontend/.env.example` to `frontend/.env.local`:
-
-```bash
-cp frontend/.env.example frontend/.env.local
-```
-
-`NEXT_PUBLIC_API_BASE_URL` must be a URL reachable from the browser (e.g. `http://localhost:8000`), not a Docker-internal hostname — it gets baked into the client-side JS bundle at build time.
-
-## Installation
-
-```bash
-git clone <your-repo-url>
-cd AI-agency-
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-
-cd frontend
-npm install
-cd ..
-```
-
-## Running everything locally (without Docker)
-
-You need Postgres running somewhere reachable. The simplest way is to start just the `db` service from Docker Compose and run the API and frontend directly:
-
-```bash
-docker compose up -d db
-```
-
-Then, in separate terminals:
-
-```bash
-# Terminal 1: backend
-source .venv/bin/activate
-uvicorn app.main:app --reload
-
-# Terminal 2: frontend
-cd frontend
-npm run dev
-```
-
-- API: http://localhost:8000
-- Frontend: http://localhost:3000
-
-## Running with Docker Compose (full stack)
-
-```bash
+```sh
 docker compose up --build
 ```
 
-This starts:
+Open `http://localhost:3000/register`, create an account, select or create a workspace, and upload a text document from Knowledge. Then open Assistant and ask about that document. API documentation is at `http://localhost:8000/docs`.
 
-- PostgreSQL on port 5432
-- the FastAPI API on port 8000
-- the Next.js frontend on port 3000
+The Compose database uses a named volume; API files use the `./storage` bind mount. Services create their database tables on startup. The committed database password is a local development default, not a production credential.
 
-The `frontend` service builds `frontend/Dockerfile` with `NEXT_PUBLIC_API_BASE_URL=http://localhost:8000` baked in at build time (see `docker-compose.yml`) so the browser can reach the API. If you deploy this somewhere other than localhost, update that build arg to the API's public URL and rebuild.
+For frontend development outside Docker, install Node.js 22 and npm, start the backend with `docker compose up --build db api`, then in another terminal run:
 
-## API overview
-
-### Authentication (`/auth`)
-
-- `POST /auth/register`
-- `POST /auth/login`
-- `GET /auth/me`
-- `PATCH /auth/users/{user_id}/workspaces/{workspace_id}`
-
-### Workspaces (`/workspaces`)
-
-- `POST /workspaces/`
-- `GET /workspaces/`
-- `GET /workspaces/{workspace_id}`
-- `PUT /workspaces/{workspace_id}`
-- `PATCH /workspaces/{workspace_id}/archive`
-
-### Workspace settings (`/workspace/settings`)
-
-- `GET /workspace/settings?workspace_id=...`
-- `PUT /workspace/settings`
-
-### Documents (`/workspaces/{workspace_id}/documents`)
-
-- `GET /workspaces/{workspace_id}/documents`
-- `POST /workspaces/{workspace_id}/documents` (multipart file upload)
-- `DELETE /workspaces/{workspace_id}/documents/{document_id}`
-
-### AI Assistant (`/assistant`)
-
-- `POST /assistant/chat`
-
-### Conversations (`/conversations`)
-
-- `GET /conversations?workspace_id=...`
-- `POST /conversations`
-- `GET /conversations/{conversation_id}`
-- `PATCH /conversations/{conversation_id}`
-- `DELETE /conversations/{conversation_id}`
-
-## Usage flow
-
-1. Start the backend and frontend (see above).
-2. Register a new account at `/register`, or sign in at `/login`.
-3. A default workspace is created automatically for a brand-new account.
-4. Upload documents from the Knowledge page.
-5. Wait for processing and indexing to complete.
-6. Ask questions about the uploaded knowledge from the Assistant page.
-
-## Testing
-
-```bash
-docker compose up -d db   # tests hit the real Postgres container
-pytest
+```sh
+cp frontend/.env.example frontend/.env.local
+npm --prefix frontend ci
+npm --prefix frontend run dev
 ```
 
-The suite (`tests/`) covers authentication, workspace isolation/authorization, document upload/deletion, and the assistant/RAG chat endpoint (with the OpenAI call mocked). It exercises the real FastAPI app, the real Postgres container, and the real local embedding model/ChromaDB — there's no test-double database, matching the rest of the codebase's raw-SQL, no-ORM design.
+### Tests
 
-## Current status
+The pytest suite exercises authentication, document upload/deletion, workspace access and retrieval. It uses real PostgreSQL, ChromaDB and local embeddings; answer calls are mocked. Run it against disposable local data. The Docker build excludes tests, so mount them explicitly:
 
-- Auth, workspace management/isolation, document upload/indexing/deletion, RAG retrieval with citations, and conversation history all work end-to-end and are covered by tests.
-- Next.js is the only frontend; the previous Streamlit frontend has been removed.
-- All application state lives in PostgreSQL (users, workspaces, workspace settings, documents, conversations) — no JSON-file storage remains.
+```sh
+docker compose up -d db
+docker compose build api
+docker compose run --rm -e OPENAI_API_KEY=test-placeholder -v "$PWD/tests:/app/tests:ro" api python -m pytest -q
+```
 
-## Known technical debt
+The first retrieval test can download the embedding model. Native macOS Python installation is not covered by the locked requirements, which pin a Linux CPU Torch wheel. Frontend checks are `npm --prefix frontend run lint` and `npm --prefix frontend run build` after installation.
 
-- No database migration tool: each service creates its table with `CREATE TABLE IF NOT EXISTS` on startup. Fine for the current scale; will need a real migration tool (e.g. Alembic) before schema changes become routine.
-- `frontend/package.json` pins `next` and a few other packages to exact versions rather than ranges; `npm audit` currently reports vulnerabilities in `next` and some transitive dependencies that a version bump would fix, but doing so needs `--force` due to the exact pin — left as-is to avoid an unreviewed breaking upgrade during this cleanup pass.
-- `requirements.txt` includes some large transitive packages (e.g. `pandas`, `pyarrow`, `kubernetes`, `GitPython`) that don't appear to be used directly by any remaining code; they weren't removed since a `pip freeze`-style requirements file makes "unused" hard to verify with full confidence, but they're worth auditing before a production deploy.
+## Implementation status
+
+- Implemented in `main`: registration/login, workspace access checks, upload/list/delete routes, local embedding and indexing, similarity filtering, answers with source metadata, saved conversations and workspace settings.
+- Readers exist for PDF, DOCX, TXT, Markdown, CSV, XLSX, HTML, JSON, XML and PPTX. PDF extraction requires a text layer; there is no OCR pipeline.
+- Not implemented in `main`: streamed answers, hybrid keyword/vector retrieval, model use of conversation history, or automated checks that generated citations match their claims.
+
+Screenshot placeholder: capture the Assistant page with a question about a sample document, its answer and the expanded Sources panel. Keep the active workspace visible and use non-confidential sample content.
+
+## Known limitations
+
+- This is a prototype. End-to-end model behavior and the integration tests have not been verified for this documentation pass.
+- Ingestion and model calls are synchronous. A first model download or long request can exceed the frontend's 30-second timeout.
+- Returned sources describe retrieved chunks; some can be omitted from the model context by its size budget. Citations are prompted, not independently validated.
+- Local files and Chroma storage need backup alongside PostgreSQL. There is no versioned database migration framework or distributed job queue.
+- Defaults target local development, including database credentials, HTTP origins and browser token storage. Changing the embedding model or an existing collection's distance metric requires rebuilding its index.
+- Experimental branches are separate from the default-branch application documented here.
 
 ## License
 
-This project is currently distributed as an internal/local project template. Adjust the license as needed for your environment.
-
-## Maintainers
-
-Maintained by the project contributors.
+[MIT](LICENSE).
