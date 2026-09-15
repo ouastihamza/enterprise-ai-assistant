@@ -10,3 +10,16 @@ node_modules/
 storage/*
 WORK_PROGRESS.md
 requested_files_export.md
+
+# Local credentials and generated data at any depth.
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+*.log
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/

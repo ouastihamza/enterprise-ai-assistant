@@ -1,2 +1,10 @@
 node_modules
 .next
+
+# Keep local credentials out of the image build context.
+.env
+.env.*
+!.env.example
+.git
+*.pem
+*.key
