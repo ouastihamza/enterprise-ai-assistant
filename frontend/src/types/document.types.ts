@@ -8,4 +8,6 @@ export interface KnowledgeDocument {
   uploaded_at: string | null;
   last_indexed: string | null;
   error_message: string | null;
+  customer_id: string | null;
+  category: "Contract" | "Invoice" | "Consumption" | "Procedure" | "Other";
 }

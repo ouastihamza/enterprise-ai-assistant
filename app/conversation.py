@@ -7,6 +7,7 @@ import psycopg2
 import psycopg2.extras
 
 from app.config import DB_DSN
+from app.services.conversation_helpers import build_regeneration_context
 
 
 class ConversationManager:
@@ -538,6 +539,57 @@ class ConversationManager:
                 "system",
             }
         ]
+
+    def get_regeneration_context(self, limit: int = 10) -> dict:
+        self.messages = self.load_history()
+        return build_regeneration_context(self.messages, limit=limit)
+
+    def replace_assistant_message(
+        self,
+        message_id: str,
+        message: str,
+        sources: list[dict] | None = None,
+    ) -> dict:
+        clean_content = message.strip()
+        if not clean_content:
+            raise ValueError("Message content cannot be empty.")
+
+        now = datetime.now(timezone.utc)
+        with self._get_conn() as connection:
+            with connection.cursor(
+                cursor_factory=psycopg2.extras.RealDictCursor
+            ) as cursor:
+                cursor.execute(
+                    """
+                    UPDATE tbl_conversation_messages
+                    SET content = %s, sources = %s::jsonb, created_at = %s
+                    WHERE id = %s AND conversation_id = %s
+                      AND workspace_id = %s AND user_id = %s
+                      AND role = 'assistant'
+                    RETURNING *
+                    """,
+                    (
+                        clean_content,
+                        json.dumps(sources or [], ensure_ascii=False),
+                        now,
+                        message_id,
+                        self.conversation_id,
+                        self.workspace_id,
+                        self.user_id,
+                    ),
+                )
+                row = cursor.fetchone()
+                if row is None:
+                    raise ValueError("The answer selected for regeneration no longer exists.")
+                cursor.execute(
+                    """
+                    UPDATE tbl_conversations SET updated_at = %s
+                    WHERE id = %s AND workspace_id = %s AND user_id = %s
+                    """,
+                    (now, self.conversation_id, self.workspace_id, self.user_id),
+                )
+        self.messages = self.load_history()
+        return self._message_row_to_dict(row)
 
     def clear_history(self) -> None:
         """

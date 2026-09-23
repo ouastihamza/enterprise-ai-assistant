@@ -65,6 +65,18 @@ Open `http://localhost:3000/register`, create an account, select or create a wor
 
 The Compose database uses a named volume; API files use the `./storage` bind mount. Services create their database tables on startup. The committed database password is a local development default, not a production credential.
 
+### Fictional customer demo
+
+After signing in, open **Customers** and choose **Prepare demo customer**. The idempotent seed action creates the fictional **Demo Industrie SAS** profile, three sites, and four clearly marked fictional documents. The documents pass through the normal ingestion and indexing pipeline.
+
+Open the customer profile, then open **Assistant** (the demo customer is selected automatically) and ask:
+
+> Why was February more expensive than January?
+
+With a valid `OPENAI_API_KEY`, the assistant combines the structured customer profile with the January invoice, February invoice, contract, and consumption documents and returns a grounded response with sources. No real customer or SEFE data is included.
+
+Customer routes live under `/workspaces/{workspace_id}/customers`: list, create, `seed-demo`, get one customer, and add a site. Document uploads accept optional `customer_id` and `category` fields.
+
 For frontend development outside Docker, install Node.js 22 and npm, start the backend with `docker compose up --build db api`, then in another terminal run:
 
 ```sh
@@ -88,6 +100,7 @@ The first retrieval test can download the embedding model. Native macOS Python i
 ## Implementation status
 
 - Implemented in `main`: registration/login, workspace access checks, upload/list/delete routes, local embedding and indexing, similarity filtering, answers with source metadata, saved conversations and workspace settings.
+- Added on this branch: workspace-scoped customer profiles and sites, optional customer/category metadata on documents, and customer-aware assistant context that combines PostgreSQL records with indexed documents.
 - Readers exist for PDF, DOCX, TXT, Markdown, CSV, XLSX, HTML, JSON, XML and PPTX. PDF extraction requires a text layer; there is no OCR pipeline.
 - Not implemented in `main`: streamed answers, hybrid keyword/vector retrieval, model use of conversation history, or automated checks that generated citations match their claims.
 

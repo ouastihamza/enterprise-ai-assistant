@@ -28,6 +28,8 @@ class DocumentRegistry:
         uploaded_at TIMESTAMPTZ NOT NULL,
         last_indexed TIMESTAMPTZ,
         error_message TEXT,
+        customer_id TEXT,
+        category TEXT NOT NULL DEFAULT 'Other',
         UNIQUE(workspace_id, name)
     );
     """
@@ -38,6 +40,15 @@ class DocumentRegistry:
 
     ALTER TABLE tbl_documents
     ALTER COLUMN last_indexed DROP NOT NULL;
+
+    ALTER TABLE tbl_documents
+    ADD COLUMN IF NOT EXISTS customer_id TEXT;
+
+    ALTER TABLE tbl_documents
+    ADD COLUMN IF NOT EXISTS category TEXT NOT NULL DEFAULT 'Other';
+
+    CREATE INDEX IF NOT EXISTS idx_documents_workspace_customer
+    ON tbl_documents(workspace_id, customer_id);
     """
 
     def __init__(
@@ -105,6 +116,8 @@ class DocumentRegistry:
             "error_message": row.get(
                 "error_message"
             ),
+            "customer_id": row.get("customer_id"),
+            "category": row.get("category") or "Other",
         }
 
     def register_document(
@@ -114,6 +127,8 @@ class DocumentRegistry:
         chunks_file: str,
         chunk_count: int,
         file_size: int,
+        customer_id: str | None = None,
+        category: str = "Other",
     ) -> dict:
         now = datetime.now(
             timezone.utc
@@ -136,11 +151,13 @@ class DocumentRegistry:
                         status,
                         uploaded_at,
                         last_indexed,
-                        error_message
+                        error_message,
+                        customer_id,
+                        category
                     )
                     VALUES (
                         %s, %s, %s, %s, %s, %s,
-                        TRUE, 'Ready', %s, %s, NULL
+                        TRUE, 'Ready', %s, %s, NULL, %s, %s
                     )
                     ON CONFLICT (workspace_id, name)
                     DO UPDATE SET
@@ -151,7 +168,9 @@ class DocumentRegistry:
                         indexed = TRUE,
                         status = 'Ready',
                         last_indexed = EXCLUDED.last_indexed,
-                        error_message = NULL
+                        error_message = NULL,
+                        customer_id = EXCLUDED.customer_id,
+                        category = EXCLUDED.category
                     RETURNING *
                     """,
                     (
@@ -163,6 +182,8 @@ class DocumentRegistry:
                         file_size,
                         now,
                         now,
+                        customer_id,
+                        category,
                     ),
                 )
 
@@ -172,20 +193,25 @@ class DocumentRegistry:
 
     def get_all_documents(
         self,
+        customer_id: str | None = None,
     ) -> list[dict]:
         with self._get_conn() as connection:
             with connection.cursor(
                 cursor_factory=psycopg2.extras.RealDictCursor
             ) as cursor:
-                cursor.execute(
-                    """
-                    SELECT *
-                    FROM tbl_documents
-                    WHERE workspace_id = %s
-                    ORDER BY uploaded_at DESC
-                    """,
-                    (self.workspace_id,),
-                )
+                if customer_id:
+                    cursor.execute(
+                        """SELECT * FROM tbl_documents
+                        WHERE workspace_id = %s AND customer_id = %s
+                        ORDER BY uploaded_at DESC""",
+                        (self.workspace_id, customer_id),
+                    )
+                else:
+                    cursor.execute(
+                        """SELECT * FROM tbl_documents
+                        WHERE workspace_id = %s ORDER BY uploaded_at DESC""",
+                        (self.workspace_id,),
+                    )
 
                 rows = cursor.fetchall()
 

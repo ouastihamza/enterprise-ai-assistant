@@ -33,10 +33,16 @@ import {
   listDocuments,
   uploadDocument,
 } from "../../../services/documents.service";
+import { listCustomers } from "../../../services/customers.service";
 
 import type {
   KnowledgeDocument,
 } from "../../../types/document.types";
+import type { Customer } from "../../../types/customer.types";
+
+const DOCUMENT_CATEGORIES: KnowledgeDocument["category"][] = [
+  "Contract", "Invoice", "Consumption", "Procedure", "Other",
+];
 
 type PendingUpload = {
   id: string;
@@ -171,6 +177,10 @@ export default function KnowledgePage() {
   const [deletingId, setDeletingId] = useState<
     number | null
   >(null);
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [selectedCustomerId, setSelectedCustomerId] = useState("");
+  const [selectedCategory, setSelectedCategory] =
+    useState<KnowledgeDocument["category"]>("Other");
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dragCounter = useRef(0);
@@ -201,6 +211,13 @@ export default function KnowledgePage() {
     loadDocuments();
   }, [loadDocuments]);
 
+  useEffect(() => {
+    if (!workspaceId) return;
+    void listCustomers(workspaceId)
+      .then(setCustomers)
+      .catch(() => setCustomers([]));
+  }, [workspaceId]);
+
   const uploadOne = useCallback(
     async (file: File) => {
       if (!workspaceId) return;
@@ -215,7 +232,10 @@ export default function KnowledgePage() {
       ]);
 
       try {
-        await uploadDocument(workspaceId, file);
+        await uploadDocument(workspaceId, file, {
+          customerId: selectedCustomerId || undefined,
+          category: selectedCategory,
+        });
 
         setPendingUploads((current) =>
           current.filter(
@@ -240,7 +260,7 @@ export default function KnowledgePage() {
         );
       }
     },
-    [workspaceId, loadDocuments]
+    [workspaceId, loadDocuments, selectedCustomerId, selectedCategory]
   );
 
   const handleFiles = useCallback(
@@ -346,7 +366,7 @@ export default function KnowledgePage() {
           </span>
 
           <h1>
-            Knowledge base
+            Company documents
             <span>
               {" "}
               for{" "}
@@ -358,10 +378,29 @@ export default function KnowledgePage() {
         </div>
 
         <p>
-          Upload documents here and they become
-          searchable inside your AI assistant, isolated
-          to this workspace only.
+          Upload contracts, invoices, consumption records
+          and procedures so the assistant can use them in
+          clear, sourced answers.
         </p>
+      </section>
+
+      <section className="knowledge-upload-context" aria-label="Upload details">
+        <label>
+          Customer
+          <select value={selectedCustomerId} onChange={(event) => setSelectedCustomerId(event.target.value)}>
+            <option value="">General workspace document</option>
+            {customers.map((customer) => (
+              <option key={customer.id} value={customer.id}>{customer.company_name}</option>
+            ))}
+          </select>
+        </label>
+        <label>
+          Category
+          <select value={selectedCategory} onChange={(event) => setSelectedCategory(event.target.value as KnowledgeDocument["category"])}>
+            {DOCUMENT_CATEGORIES.map((category) => <option key={category}>{category}</option>)}
+          </select>
+        </label>
+        <p>These labels keep customer documents organized and improve grounded answers.</p>
       </section>
 
       <section
@@ -517,6 +556,13 @@ export default function KnowledgePage() {
 
                 <span className="knowledge-table__size">
                   {formatBytes(doc.file_size)}
+                </span>
+
+                <span className="knowledge-table__category">
+                  <strong>{doc.category}</strong>
+                  <small>
+                    {customers.find((customer) => customer.id === doc.customer_id)?.company_name || "General workspace"}
+                  </small>
                 </span>
 
                 <span className="knowledge-table__date">
@@ -714,7 +760,7 @@ export default function KnowledgePage() {
 
         .knowledge-table__row {
           display: grid;
-          grid-template-columns: 1fr 90px 110px 120px 40px;
+          grid-template-columns: minmax(180px, 1fr) 100px 80px 110px 120px 40px;
           align-items: center;
           gap: 1rem;
           padding: 0.85rem 1.1rem;
@@ -743,6 +789,16 @@ export default function KnowledgePage() {
         .knowledge-table__size,
         .knowledge-table__date {
           opacity: 0.65;
+        }
+
+        .knowledge-table__category {
+          width: fit-content;
+          padding: 0.25rem 0.55rem;
+          border-radius: 999px;
+          color: #067e91;
+          background: rgba(13, 184, 189, 0.1);
+          font-size: 0.72rem;
+          font-weight: 650;
         }
 
         .knowledge-table__delete {
@@ -814,6 +870,7 @@ export default function KnowledgePage() {
             grid-template-columns: 1fr 40px;
             grid-template-areas:
               "name delete"
+              "category category"
               "size size"
               "date date"
               "status status";
@@ -830,6 +887,10 @@ export default function KnowledgePage() {
 
           .knowledge-table__size {
             grid-area: size;
+          }
+
+          .knowledge-table__category {
+            grid-area: category;
           }
 
           .knowledge-table__date {

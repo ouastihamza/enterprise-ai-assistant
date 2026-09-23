@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 
 export function AppLoader() {
   return (
-    <main className="app-loader" aria-label="Loading AI Agency">
+    <main className="app-loader" aria-label="Loading Atlas">
       <div className="app-loader__visual">
         <motion.div
           className="app-loader__orbit app-loader__orbit--one"

@@ -109,7 +109,7 @@ export default function RegisterPage() {
     return (
       <main className="auth-loading-screen">
         <div className="auth-loading-screen__mark">
-          V
+          A
         </div>
 
         <p>Preparing your workspace...</p>
@@ -129,13 +129,13 @@ export default function RegisterPage() {
         <div className="auth-brand-panel">
           <header className="auth-brand">
             <div className="auth-brand__mark">
-              V
+              A
             </div>
 
             <div>
-              <strong>AI Agency</strong>
+              <strong>ATLAS</strong>
               <span>
-                Enterprise AI Platform
+                Enterprise Intelligence
               </span>
             </div>
           </header>
@@ -147,15 +147,11 @@ export default function RegisterPage() {
             </span>
 
             <h1>
-              Put your company&apos;s knowledge
-              <span> into motion.</span>
+              One clear view of every customer.
             </h1>
 
             <p>
-              Search internal documents, access
-              trusted answers and collaborate with
-              secure AI inside one isolated company
-              workspace.
+              Bring customer details and documents together, then ask Atlas for clear, sourced answers.
             </p>
 
             <div className="auth-capabilities">
@@ -164,11 +160,11 @@ export default function RegisterPage() {
 
                 <span>
                   <strong>
-                    Workspace isolated
+                    Customer data protected
                   </strong>
 
-                  Company data remains separated by
-                  workspace.
+                  Each company sees only its own
+                  information.
                 </span>
               </div>
 
@@ -201,7 +197,7 @@ export default function RegisterPage() {
           </div>
 
           <footer className="auth-brand-panel__footer">
-            AI Agency · Enterprise AI Platform
+            ATLAS · Enterprise Intelligence
           </footer>
         </div>
 

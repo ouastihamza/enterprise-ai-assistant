@@ -28,16 +28,16 @@ export function PlatformShell({
       ) : error ? (
         <main className="platform-state">
           <span>Workspace unavailable</span>
-          <h1>AI Agency could not load your workspace.</h1>
+          <h1>Atlas could not load your workspace.</h1>
           <p>{error}</p>
         </main>
       ) : !activeWorkspace ? (
         <main className="platform-state">
-          <span>No workspace</span>
-          <h1>Create your first company workspace.</h1>
+          <span>Workspace unavailable</span>
+          <h1>No company workspace is available.</h1>
           <p>
-            Workspace onboarding will be connected in
-            the next checkpoint.
+            Sign out and try again, or ask your workspace
+            administrator for access.
           </p>
         </main>
       ) : (

@@ -36,7 +36,7 @@ const DEFAULT_WORKSPACE_REQUEST: CreateWorkspaceRequest = {
   name: "company-x-workspace",
   company_name: "Company X",
   industry: "General Business",
-  description: "Internal AI assistant for company documents.",
+  description: "Customer intelligence and grounded document answers.",
   enabled_modules: ["ai_knowledge_assistant"],
 };
 
@@ -170,7 +170,7 @@ export function WorkspaceProvider({
         setSettings(null);
 
         setError(
-          "AI Agency could not load your company workspaces."
+          "Atlas could not load your company workspaces."
         );
       } finally {
         setIsLoading(false);

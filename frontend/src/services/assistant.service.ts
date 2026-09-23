@@ -40,18 +40,94 @@ export interface AssistantSource {
   // Spreadsheet metadata
   sheet_number?: number | null;
   sheet_name?: string | null;
+
+  document_id?: number | null;
+  category?: string | null;
+  customer_id?: string | null;
+  customer_name?: string | null;
+  scope?: string | null;
 }
 
 export interface AssistantChatRequest {
   workspace_id: string;
   question: string;
   conversation_id?: string | null;
+  customer_id?: string | null;
+  regenerate?: boolean;
 }
 
 export interface AssistantChatResponse {
   conversation_id: string;
   answer: string;
   sources: AssistantSource[];
+}
+
+export type AssistantStreamEvent =
+  | { type: "start"; conversation_id: string }
+  | { type: "status"; message: string }
+  | { type: "metadata"; sources: AssistantSource[] }
+  | { type: "delta"; delta: string }
+  | (AssistantChatResponse & { type: "complete" })
+  | { type: "error"; message: string };
+
+export async function streamAssistantMessage(
+  payload: AssistantChatRequest,
+  onEvent: (event: AssistantStreamEvent) => void,
+  signal?: AbortSignal
+): Promise<void> {
+  const token =
+    typeof window !== "undefined"
+      ? localStorage.getItem("access_token")
+      : null;
+  const baseUrl = String(api.defaults.baseURL || "").replace(/\/$/, "");
+  const response = await fetch(`${baseUrl}/assistant/chat/stream`, {
+    method: "POST",
+    headers: {
+      Accept: "application/x-ndjson",
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify(payload),
+    signal,
+  });
+
+  if (!response.ok) {
+    let message = "Atlas could not complete this request.";
+    try {
+      const body = (await response.json()) as { detail?: string };
+      message = body.detail || message;
+    } catch {
+      // Keep the safe fallback when the response is not JSON.
+    }
+    throw new Error(message);
+  }
+  if (!response.body) {
+    throw new Error("The assistant stream could not be opened.");
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffered = "";
+
+  const emitLines = (text: string) => {
+    buffered += text;
+    const lines = buffered.split("\n");
+    buffered = lines.pop() || "";
+    for (const line of lines) {
+      if (!line.trim()) continue;
+      onEvent(JSON.parse(line) as AssistantStreamEvent);
+    }
+  };
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    emitLines(decoder.decode(value, { stream: true }));
+  }
+  emitLines(decoder.decode());
+  if (buffered.trim()) {
+    onEvent(JSON.parse(buffered) as AssistantStreamEvent);
+  }
 }
 
 function isTimeoutError(error: unknown): boolean {
